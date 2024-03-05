@@ -33,6 +33,19 @@ class Outfit;
 class Sound;
 class Sprite;
 
+struct DBLoadWeaponArgs {
+    int *lifetime;
+    double *velocity;
+    double *reload;
+    double *firingEnergy;
+    double *firingHeat;
+    double *inaccuracy;
+    double *shieldDamage;
+    double *hullDamage;
+    std::string *weaponAttributes;
+    DBLoadSpriteArgs *spriteArgs;
+};
+
 
 
 // Class representing all the characteristics of a weapon, including sprites and
@@ -58,6 +71,7 @@ public:
 
 public:
 	// Load from a "weapon" node, either in an outfit, a ship (explosion), or a hazard.
+    void DBLoadWeapon(DBLoadWeaponArgs &args);
 	void LoadWeapon(const DataNode &node);
 	bool IsWeapon() const;
 

@@ -202,6 +202,35 @@ const Government *Body::GetGovernment() const
 	return government;
 }
 
+void Body::DBLoadSprite(DBLoadSpriteArgs &args) {
+    sprite = SpriteSet::Get(*args.spriteName);
+
+    if(args.frameTime != nullptr)
+        frameRate = 1. / *args.frameTime;
+
+    if(args.delay != nullptr)
+        delay = *args.delay;
+
+    if(args.scale != nullptr)
+        scale = float(*args.scale);
+
+    if(args.frameRate != nullptr)
+        frameRate = float(*args.frameRate) / 60.;
+
+    if(args.randomStartFrame != nullptr)
+        randomize = true;
+
+    if(args.rewind != nullptr)
+        rewind = true;
+
+    if(args.noRepeat != nullptr) {
+        repeat = false;
+        startAtZero = true;
+    }
+
+    if(scale != 1.f)
+        GameData::GetMaskManager().RegisterScale(sprite, Scale());
+}
 
 
 // Load the sprite specification, including all animation attributes.

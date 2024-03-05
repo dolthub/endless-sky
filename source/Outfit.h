@@ -31,6 +31,16 @@ class Effect;
 class Sound;
 class Sprite;
 
+struct DBLoadOutfitArgs {
+public:
+    std::string *category;
+    std::string *description;
+    std::string *thumbnail;
+    int *cost;
+    double *mass;
+    std::string *attributes;
+    DBLoadWeaponArgs *weaponArgs;
+};
 
 
 // Class representing an outfit that can be installed in a ship. A ship's
@@ -47,6 +57,7 @@ public:
 public:
 	// An "outfit" can be loaded from an "outfit" node or from a ship's
 	// "attributes" node.
+    void DBLoad(DBLoadOutfitArgs &args);
 	void Load(const DataNode &node);
 	bool IsDefined() const;
 

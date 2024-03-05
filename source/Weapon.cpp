@@ -26,6 +26,47 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 using namespace std;
 
+void Weapon::DBLoadWeapon(DBLoadWeaponArgs &args) {
+    if (args.lifetime != nullptr) {
+        lifetime = *args.lifetime;
+    }
+
+    if (args.velocity != nullptr) {
+        velocity = *args.velocity;
+    }
+
+    if (args.reload != nullptr) {
+        reload = *args.reload;
+    }
+
+    if (args.firingEnergy != nullptr) {
+        firingEnergy = *args.firingEnergy;
+    }
+
+    if (args.firingHeat != nullptr) {
+        firingHeat = *args.firingHeat;
+    }
+
+    if (args.inaccuracy != nullptr) {
+        inaccuracy = *args.inaccuracy;
+    }
+
+    if (args.shieldDamage != nullptr) {
+
+    }
+
+    if (args.hullDamage != nullptr) {
+
+    }
+
+    if (args.weaponAttributes != nullptr) {
+
+    }
+
+    if (args.spriteArgs != nullptr) {
+        sprite.DBLoadSprite(*args.spriteArgs);
+    }
+}
 
 
 // Load from a "weapon" node, either in an outfit or in a ship (explosion).

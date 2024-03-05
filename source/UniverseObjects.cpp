@@ -22,6 +22,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Logger.h"
 #include "Sprite.h"
 #include "SpriteSet.h"
+#include "db.h"
 
 #include <algorithm>
 #include <iterator>
@@ -32,16 +33,15 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 using namespace std;
 
-
-
 future<void> UniverseObjects::Load(const vector<string> &sources, bool debugMode)
 {
-	progress = 0.;
+    DoltDB *db = new DoltDB();
 
+    progress = 0.;
 	// We need to copy any variables used for loading to avoid a race condition.
 	// 'this' is not copied, so 'this' shouldn't be accessed after calling this
 	// function (except for calling GetProgress which is safe due to the atomic).
-	return async(launch::async, [this, sources, debugMode]() noexcept -> void
+	return async(launch::async, [this, sources, debugMode, db]() noexcept -> void
 		{
 			vector<string> files;
 			for(const string &source : sources)
@@ -56,6 +56,8 @@ future<void> UniverseObjects::Load(const vector<string> &sources, bool debugMode
 						make_move_iterator(list.end()));
 			}
 
+            LoadDB(db, debugMode);
+
 			const double step = 1. / (static_cast<int>(files.size()) + 1);
 			for(const auto &path : files)
 			{
@@ -69,6 +71,11 @@ future<void> UniverseObjects::Load(const vector<string> &sources, bool debugMode
 			FinishLoading();
 			progress = 1.;
 		});
+
+    //LoadOutfitters(db);
+
+    delete db;
+    db = nullptr;
 }
 
 
@@ -314,7 +321,269 @@ void UniverseObjects::CheckReferences()
 			Warn("color", it.first);
 }
 
+void UniverseObjects::LoadDB(DB *db, bool debugMode)
+{
+    LoadOutfitters(db, debugMode);
+    LoadOutfits(db, debugMode);
+    LoadColors(db, debugMode);
+    LoadGalaxies(db, debugMode);
+    LoadStars(db, debugMode);
+}
 
+void UniverseObjects::LoadOutfitters(DB *db, bool debugMode) {
+    string loadOutfittersQuery = "SELECT outfitters.name as name, outfitter_outfits.outfit_name_fk as outfit_name "
+                                       "FROM outfitters "
+                                       "LEFT JOIN outfitter_outfits ON outfitters.name = outfitter_outfits.outfitter_name_fk "
+                                       "ORDER BY name, outfit_name;";
+
+    std::map<string, std::vector<string>> outfitters;
+    Rows *rows = db->SelectQuery(loadOutfittersQuery);
+    while (rows->Next()) {
+        string name;
+        string outfitName;
+
+        if (rows->String("name", &name) && rows->String("outfit_name", &outfitName))
+        {
+            if (outfitters.find(name) == outfitters.end())
+            {
+                outfitters[name] = std::vector<string>();
+            }
+
+            outfitters[name].push_back(outfitName);
+        }
+    }
+
+    for (auto & outfitter : outfitters)
+    {
+        outfitSales.Get(outfitter.first)->DBLoad(outfitter.second, outfits);
+    }
+
+    delete rows;
+}
+
+void UniverseObjects::LoadOutfits(DB *db, bool debugMode)
+{
+    const char * loadOutfitsQuery = "SELECT outfits.name as name,"
+                                    "outfits.category as category,"
+                                    "outfits.description as description,"
+                                    "outfits.thumbnail as thumbnail,"
+                                    "outfits.cost as cost,"
+                                    "outfits.mass as mass,"
+                                    "outfits.attributes as attributes,"
+                                    "outfits.weapon_id_fk as weapon_id,"
+                                    "weapons.lifetime as lifetime,"
+                                    "weapons.velocity as velocity,"
+                                    "weapons.reload as reload,"
+                                    "weapons.firing_energy as firing_energy,"
+                                    "weapons.firing_heat as firing_heat,"
+                                    "weapons.inaccuracy as inaccuracy,"
+                                    "weapons.shield_damage as shield_damage,"
+                                    "weapons.hull_damage as hull_damage,"
+                                    "weapons.attributes as weapon_attributes,"
+                                    "sprites.name as sprite_name,"
+                                    "sprites.frame_time as frame_time,"
+                                    "sprites.delay as delay,"
+                                    "sprites.scale as scale,"
+                                    "sprites.frame_rate as frame_rate,"
+                                    "sprites.random_start_frame as random_start_frame,"
+                                    "sprites.rewind as rewind,"
+                                    "sprites.no_repeat as no_repeat "
+                                    "FROM outfits "
+                                    "LEFT JOIN weapons ON outfits.weapon_id_fk = weapons.id "
+                                    "LEFT JOIN sprites ON sprites.id = weapons.sprite_id_fk "
+                                    "ORDER BY name;";
+
+    Rows *rows = db->SelectQuery(loadOutfitsQuery);
+    while (rows->Next()) {
+        string name;
+        DBLoadSpriteArgs spriteArgs;
+        DBLoadWeaponArgs weaponArgs;
+        DBLoadOutfitArgs outfitArgs;
+
+        memset(&spriteArgs, 0, sizeof(DBLoadSpriteArgs));
+        memset(&weaponArgs, 0, sizeof(DBLoadWeaponArgs));
+        memset(&outfitArgs, 0, sizeof(DBLoadOutfitArgs));
+
+        if (rows->String("name", &name))
+        {
+            std::string category;
+            std::string description;
+            std::string thumbnail;
+            int cost;
+            double mass;
+            std::string attributes;
+            std::string weaponId;
+            int lifetime;
+            double velocity;
+            double reload;
+            double firingEnergy;
+            double firingHeat;
+            double inaccuracy;
+            double shieldDamage;
+            double hullDamage;
+            std::string weaponAttributes;
+            std::string spriteName;
+            double frameTime;
+            int delay;
+            double scale;
+            double frameRate;
+            bool randomStartFrame;
+            bool rewind;
+            bool noRepeat;
+
+            if (rows->String("category", &category))
+                outfitArgs.category = &category;
+
+            if (rows->String("description", &description))
+                outfitArgs.description = &description;
+
+            if (rows->String("thumbnail", &thumbnail))
+                outfitArgs.thumbnail = &thumbnail;
+
+            if (rows->Int("cost", &cost))
+                outfitArgs.cost = &cost;
+
+            if (rows->Double("mass", &mass))
+                outfitArgs.mass = &mass;
+
+            if (rows->String("attributes", &attributes))
+                outfitArgs.attributes = &attributes;
+
+            if (rows->String("weapon_id", &weaponId))
+            {
+                outfitArgs.weaponArgs = &weaponArgs;
+
+                if (rows->Int("lifetime", &lifetime))
+                    weaponArgs.lifetime = &lifetime;
+
+                if (rows->Double("velocity", &velocity))
+                    weaponArgs.velocity = &velocity;
+
+                if (rows->Double("reload", &reload))
+                    weaponArgs.reload = &reload;
+
+                if (rows->Double("firing_energy", &firingEnergy))
+                    weaponArgs.firingEnergy = &firingEnergy;
+
+                if (rows->Double("firing_heat", &firingHeat))
+                    weaponArgs.firingHeat = &firingHeat;
+
+                if (rows->Double("inaccuracy", &inaccuracy))
+                    weaponArgs.inaccuracy = &inaccuracy;
+
+                if (rows->Double("shield_damage", &shieldDamage))
+                    weaponArgs.shieldDamage = &shieldDamage;
+
+                if (rows->Double("hull_damage", &hullDamage))
+                    weaponArgs.hullDamage = &hullDamage;
+
+                if (rows->String("weapon_attributes", &weaponAttributes))
+                    weaponArgs.weaponAttributes = &weaponAttributes;
+
+                if (rows->String("sprite_name", &spriteName))
+                {
+                    weaponArgs.spriteArgs = &spriteArgs;
+                    spriteArgs.spriteName = &spriteName;
+
+                    if (rows->Double("frame_time", &frameTime))
+                        spriteArgs.frameTime = &frameTime;
+
+                    if (rows->Int("delay", &delay))
+                        spriteArgs.delay = &delay;
+
+                    if (rows->Double("scale", &scale))
+                        spriteArgs.scale = &scale;
+
+                    if (rows->Double("frame_rate", &frameRate))
+                        spriteArgs.frameRate = &frameRate;
+
+                    if (rows->Bool("random_start_frame", &randomStartFrame))
+                        spriteArgs.randomStartFrame = &randomStartFrame;
+
+                    if (rows->Bool("rewind", &rewind))
+                        spriteArgs.rewind = &rewind;
+
+                    if (rows->Bool("no_repeat", &noRepeat))
+                        spriteArgs.noRepeat = &noRepeat;
+                }
+            }
+
+            outfits.Get(name)->DBLoad(outfitArgs);
+        }
+    }
+}
+
+void UniverseObjects::LoadColors(DB *db, bool debugMode)
+{
+    const char * loadColorsQuery = "SELECT name, red, green, blue, alpha "
+                                   "FROM color "
+                                   "ORDER BY name;";
+
+    Rows *rows = db->SelectQuery(loadColorsQuery);
+    while (rows->Next()) {
+        string name;
+        if (rows->String("name", &name)) {
+            double r = 1.0;
+            double g = 1.0;
+            double b = 1.0;
+            double a = 1.0;
+
+            rows->Double("red", &r);
+            rows->Double("green", &g);
+            rows->Double("blue", &b);
+            rows->Double("alpha", &a);
+            colors.Get(name)->Load(r, g, b, a);
+        }
+    }
+}
+
+void UniverseObjects::LoadGalaxies(DB *db, bool debugMode)
+{
+    const char * loadGalaxiesQuery = "SELECT name, posx as x, posy as y, sprite "
+                                     "FROM galaxy "
+                                     "ORDER BY name;";
+
+    Rows *rows = db->SelectQuery(loadGalaxiesQuery);
+    while (rows->Next()) {
+        string name;
+        if (rows->String("name", &name)) {
+            double x = 0.0;
+            double y = 0.0;
+            string sprite;
+
+            rows->Double("x", &x);
+            rows->Double("y", &y);
+            rows->String("sprite", &sprite);
+            galaxies.Get(name)->DBLoad(x, y, sprite);
+        }
+    }
+}
+
+void UniverseObjects::LoadStars(DB *db, bool debugMode)
+{
+    const char * loadStarsQuery = "SELECT name, power, wind "
+                                  "FROM star "
+                                  "ORDER BY name;";
+
+    Rows *rows = db->SelectQuery(loadStarsQuery);
+    while (rows->Next()) {
+        string name;
+        if (rows->String("name", &name)) {
+
+            const Sprite *sprite = SpriteSet::Get(name);
+
+            double power = 0.0;
+            if (rows->Double("power", &power)) {
+                solarPower[sprite] = power;
+            }
+
+            double wind = 0.0;
+            if (rows->Double("wind", &wind)) {
+               solarWind[sprite] = wind;
+            }
+        }
+    }
+}
 
 void UniverseObjects::LoadFile(const string &path, bool debugMode)
 {
@@ -330,8 +599,11 @@ void UniverseObjects::LoadFile(const string &path, bool debugMode)
 	{
 		const string &key = node.Token(0);
 		if(key == "color" && node.Size() >= 5)
-			colors.Get(node.Token(1))->Load(
-				node.Value(2), node.Value(3), node.Value(4), node.Size() >= 6 ? node.Value(5) : 1.);
+        {
+            // loaded via db
+            //colors.Get(node.Token(1))->Load(
+            //node.Value(2), node.Value(3), node.Value(4), node.Size() >= 6 ? node.Value(5) : 1.);
+        }
 		else if(key == "conversation" && node.Size() >= 2)
 			conversations.Get(node.Token(1))->Load(node);
 		else if(key == "effect" && node.Size() >= 2)
@@ -343,7 +615,10 @@ void UniverseObjects::LoadFile(const string &path, bool debugMode)
 		else if(key == "formation" && node.Size() >= 2)
 			formations.Get(node.Token(1))->Load(node);
 		else if(key == "galaxy" && node.Size() >= 2)
-			galaxies.Get(node.Token(1))->Load(node);
+        {
+            // loaded via db
+            //galaxies.Get(node.Token(1))->Load(node);
+        }
 		else if(key == "government" && node.Size() >= 2)
 			governments.Get(node.Token(1))->Load(node);
 		else if(key == "hazard" && node.Size() >= 2)
@@ -367,7 +642,10 @@ void UniverseObjects::LoadFile(const string &path, bool debugMode)
 		else if(key == "outfit" && node.Size() >= 2)
 			outfits.Get(node.Token(1))->Load(node);
 		else if(key == "outfitter" && node.Size() >= 2)
-			outfitSales.Get(node.Token(1))->Load(node, outfits);
+        {
+            // loaded via db
+            //outfitSales.Get(node.Token(1))->Load(node, outfits);
+        }
 		else if(key == "person" && node.Size() >= 2)
 			persons.Get(node.Token(1))->Load(node);
 		else if(key == "phrase" && node.Size() >= 2)
@@ -414,7 +692,8 @@ void UniverseObjects::LoadFile(const string &path, bool debugMode)
 		}
 		else if(key == "star" && node.Size() >= 2)
 		{
-			const Sprite *sprite = SpriteSet::Get(node.Token(1));
+            // loaded via db
+			/* const Sprite *sprite = SpriteSet::Get(node.Token(1));
 			for(const DataNode &child : node)
 			{
 				if(child.Token(0) == "power" && child.Size() >= 2)
@@ -423,7 +702,7 @@ void UniverseObjects::LoadFile(const string &path, bool debugMode)
 					solarWind[sprite] = child.Value(1);
 				else
 					child.PrintTrace("Skipping unrecognized attribute:");
-			}
+			}*/
 		}
 		else if(key == "news" && node.Size() >= 2)
 			news.Get(node.Token(1))->Load(node);

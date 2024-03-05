@@ -28,6 +28,16 @@ class Government;
 class Mask;
 class Sprite;
 
+struct DBLoadSpriteArgs {
+    std::string *spriteName;
+    double *frameTime;
+    int *delay;
+    double *scale;
+    double *frameRate;
+    bool *randomStartFrame;
+    bool *rewind;
+    bool *noRepeat;
+};
 
 
 // Class representing any object in the game that has a position, velocity, and
@@ -71,6 +81,7 @@ public:
 	const Government *GetGovernment() const;
 
 	// Sprite serialization.
+    void DBLoadSprite(DBLoadSpriteArgs &args);
 	void LoadSprite(const DataNode &node);
 	void SaveSprite(DataWriter &out, const std::string &tag = "sprite") const;
 	// Set the sprite.

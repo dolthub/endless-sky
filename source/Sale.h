@@ -29,6 +29,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 template <class Item>
 class Sale : public std::set<const Item *> {
 public:
+    void DBLoad(std::vector<std::string> itemNames, const Set<Item> &items);
+
 	void Load(const DataNode &node, const Set<Item> &items);
 
 	void Add(const Sale<Item> &other);
@@ -37,6 +39,11 @@ public:
 };
 
 
+template <class Item>
+void Sale<Item>::DBLoad(std::vector<std::string> itemNames, const Set<Item> &items) {
+    for(const std::string &itemName : itemNames)
+        this->insert(items.Get(itemName));
+}
 
 template <class Item>
 void Sale<Item>::Load(const DataNode &node, const Set<Item> &items)

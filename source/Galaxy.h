@@ -16,6 +16,8 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #ifndef GALAXY_H_
 #define GALAXY_H_
 
+#include <string>
+
 #include "Point.h"
 
 class DataNode;
@@ -28,6 +30,7 @@ class Sprite;
 // will never accidentally scroll the view from one to the other.
 class Galaxy {
 public:
+    void DBLoad(double x, double y, const std::string spriteName);
 	void Load(const DataNode &node);
 
 	const Point &Position() const;

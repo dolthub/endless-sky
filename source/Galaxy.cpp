@@ -21,6 +21,14 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 using namespace std;
 
 
+void Galaxy::DBLoad(double x, double y, const string spriteName) {
+    position = Point(x, y);
+
+    if (!spriteName.empty())
+    {
+        sprite = SpriteSet::Get(spriteName);
+    }
+}
 
 void Galaxy::Load(const DataNode &node)
 {

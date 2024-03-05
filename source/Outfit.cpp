@@ -195,7 +195,32 @@ namespace {
 	}
 }
 
+void Outfit::DBLoad(DBLoadOutfitArgs &args) {
+    trueName = args.name;
+    isDefined = true;
 
+    if (args.category) {
+        category = *args.category;
+    }
+    if (args.description) {
+        description = *args.description;
+    }
+    if (args.thumbnail) {
+        thumbnail = SpriteSet::Get(*args.thumbnail);
+    }
+    if (args.cost) {
+        cost = *args.cost;
+    }
+    if (args.mass) {
+        mass = *args.mass;
+    }
+    if (args.attributes) {
+
+    }
+    if (args.weaponArgs) {
+        DBLoadWeapon(*args.weaponArgs);
+    }
+}
 
 void Outfit::Load(const DataNode &node)
 {

@@ -57,6 +57,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 
 class Panel;
 class Sprite;
+class DB;
 
 
 
@@ -90,6 +91,13 @@ public:
 
 private:
 	void LoadFile(const std::string &path, bool debugMode = false);
+    void LoadDB(DB *db, bool debugMode = false);
+
+    void LoadOutfitters(DB *db, bool debugMode);
+    void LoadOutfits(DB *db, bool debugMode);
+    void LoadColors(DB *db, bool debugMode);
+    void LoadGalaxies(DB *db, bool debugMode);
+    void LoadStars(DB *db, bool debugMode);
 
 
 private:
