@@ -31,17 +31,22 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <utility>
 #include <vector>
 
+#include "json/single_include/nlohmann/json.hpp"
+
 using namespace std;
+
+bool setContains(const std::set<std::string> &s, const std::string &val) {
+    return s.find(val) != s.end();
+}
 
 future<void> UniverseObjects::Load(const vector<string> &sources, bool debugMode)
 {
-    DoltDB *db = new DoltDB();
 
     progress = 0.;
 	// We need to copy any variables used for loading to avoid a race condition.
 	// 'this' is not copied, so 'this' shouldn't be accessed after calling this
 	// function (except for calling GetProgress which is safe due to the atomic).
-	return async(launch::async, [this, sources, debugMode, db]() noexcept -> void
+	return async(launch::async, [this, sources, debugMode]() noexcept -> void
 		{
 			vector<string> files;
 			for(const string &source : sources)
@@ -56,7 +61,11 @@ future<void> UniverseObjects::Load(const vector<string> &sources, bool debugMode
 						make_move_iterator(list.end()));
 			}
 
-            LoadDB(db, debugMode);
+            bool updated = LoadDB(debugMode);
+            if (!updated) {
+                Logger::LogError("Failed to load db");
+                exit(1);
+            }
 
 			const double step = 1. / (static_cast<int>(files.size()) + 1);
 			for(const auto &path : files)
@@ -70,12 +79,15 @@ future<void> UniverseObjects::Load(const vector<string> &sources, bool debugMode
 			}
 			FinishLoading();
 			progress = 1.;
+
+            dbLoadThread = new std::thread([this]() {
+                while (true) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds (500));
+                    LoadDB();
+                }
+            });
 		});
 
-    //LoadOutfitters(db);
-
-    delete db;
-    db = nullptr;
 }
 
 
@@ -321,16 +333,74 @@ void UniverseObjects::CheckReferences()
 			Warn("color", it.first);
 }
 
-void UniverseObjects::LoadDB(DB *db, bool debugMode)
+bool UniverseObjects::LoadDB(bool debugMode)
 {
-    LoadOutfitters(db, debugMode);
-    LoadOutfits(db, debugMode);
-    LoadColors(db, debugMode);
-    LoadGalaxies(db, debugMode);
-    LoadStars(db, debugMode);
+    DoltDB *db = new DoltDB();
+
+    std::set<std::string> changed;
+    bool updated = false;
+    if (LoadHashes(db, changed, debugMode)) {
+        if (changed.size() > 0) {
+            updated = true;
+
+            LoadOutfitters(db, changed, debugMode);
+            LoadOutfits(db, changed, debugMode);
+            LoadColors(db, changed, debugMode);
+            LoadGalaxies(db, changed, debugMode);
+            LoadStars(db, changed, debugMode);
+        }
+    }
+
+    delete db;
+    return updated;
 }
 
-void UniverseObjects::LoadOutfitters(DB *db, bool debugMode) {
+bool UniverseObjects::LoadHashes(DB *db, std::set<std::string> &changed, bool debugMode)
+{
+    std::vector<std::string> tables = {"color", "galaxy", "outfits", "outfitter_outfits", "outfitters", "sprites", "star", "weapons"};
+    std::string query = "SELECT ";
+
+    int last = tables.size() - 1;
+    for (int i = 0; i < tables.size(); i++) {
+        query += "hashof_table('" + tables[i] + "') as " + tables[i];
+        if (i < last) {
+            query += ", ";
+        }
+    }
+
+    Rows *rows = db->SelectQuery(query);
+
+    if (rows == nullptr) {
+        return false;
+    }
+
+    bool success = true;
+    if (rows->Next()) {
+        std::string hash;
+        for (int i = 0; i < tables.size(); i++) {
+            std::string tblName = tables[i];
+            if (rows->String(tblName, &hash)) {
+                std::string existing = tableHashes[tblName];
+                if (existing != hash) {
+                    changed.insert(tblName);
+                    tableHashes[tblName] = hash;
+                }
+            } else {
+                success = false;
+                break;
+            }
+        }
+    }
+
+    delete rows;
+    return success;
+}
+
+void UniverseObjects::LoadOutfitters(DB *db, const std::set<std::string> &changed, bool debugMode) {
+    if (!setContains(changed, "outfitters") && !setContains(changed, "outfitter_outfits")) {
+        return;
+    }
+
     string loadOutfittersQuery = "SELECT outfitters.name as name, outfitter_outfits.outfit_name_fk as outfit_name "
                                        "FROM outfitters "
                                        "LEFT JOIN outfitter_outfits ON outfitters.name = outfitter_outfits.outfitter_name_fk "
@@ -361,8 +431,12 @@ void UniverseObjects::LoadOutfitters(DB *db, bool debugMode) {
     delete rows;
 }
 
-void UniverseObjects::LoadOutfits(DB *db, bool debugMode)
+void UniverseObjects::LoadOutfits(DB *db, const std::set<std::string> &changed, bool debugMode)
 {
+    if (!setContains(changed, "outfits") && !setContains(changed, "weapons") && !setContains(changed, "sprites")) {
+        return;
+    }
+
     const char * loadOutfitsQuery = "SELECT outfits.name as name,"
                                     "outfits.category as category,"
                                     "outfits.description as description,"
@@ -406,6 +480,8 @@ void UniverseObjects::LoadOutfits(DB *db, bool debugMode)
 
         if (rows->String("name", &name))
         {
+            outfitArgs.name = &name;
+
             std::string category;
             std::string description;
             std::string thumbnail;
@@ -513,8 +589,12 @@ void UniverseObjects::LoadOutfits(DB *db, bool debugMode)
     }
 }
 
-void UniverseObjects::LoadColors(DB *db, bool debugMode)
+void UniverseObjects::LoadColors(DB *db, const std::set<std::string> &changed, bool debugMode)
 {
+    if (!setContains(changed, "color")) {
+        return;
+    }
+
     const char * loadColorsQuery = "SELECT name, red, green, blue, alpha "
                                    "FROM color "
                                    "ORDER BY name;";
@@ -537,8 +617,12 @@ void UniverseObjects::LoadColors(DB *db, bool debugMode)
     }
 }
 
-void UniverseObjects::LoadGalaxies(DB *db, bool debugMode)
+void UniverseObjects::LoadGalaxies(DB *db, const std::set<std::string> &changed, bool debugMode)
 {
+    if (!setContains(changed, "galaxy")) {
+        return;
+    }
+
     const char * loadGalaxiesQuery = "SELECT name, posx as x, posy as y, sprite "
                                      "FROM galaxy "
                                      "ORDER BY name;";
@@ -559,8 +643,12 @@ void UniverseObjects::LoadGalaxies(DB *db, bool debugMode)
     }
 }
 
-void UniverseObjects::LoadStars(DB *db, bool debugMode)
+void UniverseObjects::LoadStars(DB *db, const std::set<std::string> &changed, bool debugMode)
 {
+    if (!setContains(changed, "star")) {
+        return;
+    }
+
     const char * loadStarsQuery = "SELECT name, power, wind "
                                   "FROM star "
                                   "ORDER BY name;";
@@ -639,8 +727,10 @@ void UniverseObjects::LoadFile(const string &path, bool debugMode)
 			minables.Get(node.Token(1))->Load(node);
 		else if(key == "mission" && node.Size() >= 2)
 			missions.Get(node.Token(1))->Load(node);
-		else if(key == "outfit" && node.Size() >= 2)
-			outfits.Get(node.Token(1))->Load(node);
+		else if(key == "outfit" && node.Size() >= 2) {
+            // loaded via db
+            // outfits.Get(node.Token(1))->Load(node);
+        }
 		else if(key == "outfitter" && node.Size() >= 2)
         {
             // loaded via db

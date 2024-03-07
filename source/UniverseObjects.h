@@ -53,6 +53,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include <set>
 #include <string>
 #include <vector>
+#include <thread>
 
 
 class Panel;
@@ -91,13 +92,17 @@ public:
 
 private:
 	void LoadFile(const std::string &path, bool debugMode = false);
-    void LoadDB(DB *db, bool debugMode = false);
+    bool LoadDB(bool debugMode = false);
 
-    void LoadOutfitters(DB *db, bool debugMode);
-    void LoadOutfits(DB *db, bool debugMode);
-    void LoadColors(DB *db, bool debugMode);
-    void LoadGalaxies(DB *db, bool debugMode);
-    void LoadStars(DB *db, bool debugMode);
+    bool LoadHashes(DB *db, std::set<std::string> &changed, bool debugMode);
+    void LoadOutfitters(DB *db, const std::set<std::string> &changed, bool debugMode);
+    void LoadOutfits(DB *db, const std::set<std::string> &changed, bool debugMode);
+    void LoadColors(DB *db, const std::set<std::string> &changed, bool debugMode);
+    void LoadGalaxies(DB *db, const std::set<std::string> &changed, bool debugMode);
+    void LoadStars(DB *db, const std::set<std::string> &changed, bool debugMode);
+
+    // load db thread entry point
+    void operator()();
 
 
 private:
@@ -149,6 +154,9 @@ private:
 	// A local cache of the menu background interface for thread-safe access.
 	mutable std::mutex menuBackgroundMutex;
 	Interface menuBackgroundCache;
+
+    std::map<std::string, std::string> tableHashes;
+    std::thread *dbLoadThread;
 };
 
 

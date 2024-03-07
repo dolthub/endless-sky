@@ -3,6 +3,7 @@
 //
 
 #include "db.h"
+#include "logger.h"
 
 using namespace std;
 using namespace sql;
@@ -12,19 +13,29 @@ using namespace sql::mysql;
 
 DoltDB::DoltDB()
 {
-    driver = get_mysql_driver_instance();
-    conn = driver->connect("tcp://127.0.0.1:3306", "dolt", "");
-    conn->setSchema("datadb");
+    try {
+        driver = get_mysql_driver_instance();
+        conn = driver->connect("tcp://127.0.0.1:3306", "dolt", "");
+        conn->setSchema("datadb");
+    } catch (SQLException &e) {
+        Logger::LogError("Failed to connect to database: " + string(e.what()) + " (error code: " + to_string(e.getErrorCode()) + ")");
+    }
 }
 
 DoltDB::~DoltDB()
 {
-    conn->close();
-    delete conn;
+    if (conn != nullptr) {
+        conn->close();
+        delete conn;
+    }
 }
 
 Rows* DoltDB::SelectQuery(const string query)
 {
+    if (conn == nullptr) {
+        return nullptr;
+    }
+
     Statement* stmt = conn->createStatement();
     ResultSet* res = stmt->executeQuery(query);
     delete stmt;
