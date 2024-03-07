@@ -20,9 +20,8 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_DEBUG FALSE)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 # On Linux use relative RPATH.
 set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
-set(MysqlCPPConnLib /usr/local/mysql-connector-c++/lib64/libmysqlcppconn.dylib)
-set(MysqlCPPConnLibs /usr/local/mysql-connector-c++/lib64/)
-set(MysqlCPPConnInc /usr/local/mysql-connector-c++/include/)
+set(MysqlCPPConnLibs ${CMAKE_CURRENT_SOURCE_DIR}/libs/mysql-connector-c++)
+set(MysqlCPPConnInc ${MysqlCppConnLibs}/include)
 
 # Setup vcpkg.
 if(ES_USE_VCPKG)
@@ -119,7 +118,7 @@ if(MINGW)
 endif()
 
 # Link with the general libraries.
-target_link_libraries(ExternalLibraries INTERFACE SDL2::SDL2 PNG::PNG JPEG::JPEG OpenAL::OpenAL "${MysqlCPPConnLib}" "${MysqlCPPConnLibs}/libssl.3.dylib" "${MysqlCPPConnLibs}/libcrypto.3.dylib"
+target_link_libraries(ExternalLibraries INTERFACE SDL2::SDL2 PNG::PNG JPEG::JPEG OpenAL::OpenAL "${MysqlCPPConnLibs}/libmysqlcppconn.dylib" "${MysqlCPPConnLibs}/libssl.3.dylib" "${MysqlCPPConnLibs}/libcrypto.3.dylib"
 	"$<IF:$<CONFIG:Debug>,${LIBMAD_LIB_DEBUG},${LIBMAD_LIB_RELEASE}>")
 
 # Link the needed OS-specific dependencies, if any.
