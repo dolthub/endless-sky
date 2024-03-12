@@ -21,6 +21,7 @@ this program. If not, see <https://www.gnu.org/licenses/>.
 #include "Effect.h"
 #include "GameData.h"
 #include "SpriteSet.h"
+#include "Logger.h"
 
 #include <algorithm>
 #include <cmath>
@@ -196,7 +197,7 @@ namespace {
 }
 
 void Outfit::DBLoad(DBLoadOutfitArgs &args) {
-    trueName = args.name;
+    trueName = *args.name;
     isDefined = true;
 
     if (args.category) {
@@ -214,9 +215,82 @@ void Outfit::DBLoad(DBLoadOutfitArgs &args) {
     if (args.mass) {
         mass = *args.mass;
     }
-    if (args.attributes) {
 
+    if (args.attributes) {
+        json j = json::parse(*args.attributes);
+        for (json::iterator it = j.begin(); it != j.end(); ++it) {
+            const std::string &key = it.key();
+            if (key == "display name") {
+                displayName = it.value();
+            } else if (key == "series") {
+                series = it.value();
+            } else if (key == "index") {
+                index = it.value();
+            } else if (key == "plural") {
+                pluralName = it.value();
+            } else if (key == "flare sound") {
+                ++flareSounds[Audio::Get(it.value())];
+            } else if (key == "reverse flare sound") {
+                ++reverseFlareSounds[Audio::Get(it.value())];
+            } else if (key == "steering flare sound") {
+                ++steeringFlareSounds[Audio::Get(it.value())];
+            } else if (key == "afterburner effect") {
+                json::value_t t = it.value().type();
+                if (t == json::value_t::string) {
+                    ++afterburnerEffects[GameData::Effects().Get(it.value())];
+                } else if (t == json::value_t::object) {
+                    json::reference argRef = it.value().find("args").value();
+                    std::string effectName = argRef.at(0);
+                    ++afterburnerEffects[GameData::Effects().Get(effectName)];
+                }
+            } else if (key == "jump effect") {
+                ++jumpEffects[GameData::Effects().Get(it.value())];
+            } else if (key == "hyperdrive sound") {
+                ++hyperSounds[Audio::Get(it.value())];
+            } else if (key == "hyperdrive in sound") {
+                ++hyperInSounds[Audio::Get(it.value())];
+            } else if (key == "hyperdrive out sound") {
+                ++hyperOutSounds[Audio::Get(it.value())];
+            } else if (key == "jump sound") {
+                ++jumpSounds[Audio::Get(it.value())];
+            } else if (key == "jump in sound") {
+                ++jumpInSounds[Audio::Get(it.value())];
+            } else if (key == "jump out sound") {
+                ++jumpOutSounds[Audio::Get(it.value())];
+            } else if (key == "flotsam sprite") {
+                flotsamSprite = SpriteSet::Get(it.value());
+            } else if (key == "thumbnail") {
+                thumbnail = SpriteSet::Get(it.value());
+            } else if (key == "ammo") {
+                ammo = make_pair(GameData::Outfits().Get(it.value()), 0);
+            } else if (key == "licenses") {
+                json::value_t t = it.value().type();
+                if (t == json::value_t::array) {
+                    json::reference arrRef = it.value();
+                    for (json::iterator arrIt = arrRef.begin(); arrIt != arrRef.end(); ++arrIt) {
+                        licenses.push_back(arrIt.value());
+                    }
+                } else {
+                    Logger::LogError("Outfit::DBLoad licenses not an array");
+                }
+            } else if (key == "jump range") {
+                attributes[key] = it.value();
+                GameData::AddJumpRange(it.value());
+            } else if (key == "flare sprite") {
+                flareSprites.emplace_back(Body(), 1);
+                flareSprites.back().first.JsonLoadSprite(it.value());
+            } else if (key == "reverse flare sprite") {
+                reverseFlareSprites.emplace_back(Body(), 1);
+                reverseFlareSprites.back().first.JsonLoadSprite(it.value());
+            } else if (key == "steering flare sprite") {
+                steeringFlareSprites.emplace_back(Body(), 1);
+                steeringFlareSprites.back().first.JsonLoadSprite(it.value());
+            } else {
+                attributes[key] = it.value();
+            }
+        }
     }
+
     if (args.weaponArgs) {
         DBLoadWeapon(*args.weaponArgs);
     }

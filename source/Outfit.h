@@ -33,6 +33,7 @@ class Sprite;
 
 struct DBLoadOutfitArgs {
 public:
+    std::string *name;
     std::string *category;
     std::string *description;
     std::string *thumbnail;

@@ -32,6 +32,7 @@ class Effect;
 class Outfit;
 class Sound;
 class Sprite;
+struct LoadWeaponFlags;
 
 struct DBLoadWeaponArgs {
     int *lifetime;
@@ -230,6 +231,10 @@ protected:
 private:
 	double TotalDamage(int index) const;
 
+    void sanityChecks();
+    void handleFlags(LoadWeaponFlags &flags);
+    void handleBoolParam(const std::string &key, LoadWeaponFlags &flags);
+    void handleDoubleParam(const std::string &key, double value, LoadWeaponFlags &flags);
 
 private:
 	// Sprites and sounds.
