@@ -362,7 +362,7 @@ bool UniverseObjects::LoadHashes(DB *db, std::set<std::string> &changed, bool de
 
     int last = tables.size() - 1;
     for (int i = 0; i < tables.size(); i++) {
-        query += "hashof_table('" + tables[i] + "') as " + tables[i];
+        query += "dolt_hashof_table('" + tables[i] + "') as " + tables[i];
         if (i < last) {
             query += ", ";
         }

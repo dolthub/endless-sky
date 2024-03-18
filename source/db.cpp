@@ -3,7 +3,7 @@
 //
 
 #include "db.h"
-#include "logger.h"
+#include "Logger.h"
 
 using namespace std;
 using namespace sql;

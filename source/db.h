@@ -9,7 +9,7 @@
 #include <string>
 #include <map>
 
-#include "/usr/local/mysql-connector-c++/include/mysql/jdbc.h"
+#include "../libs/mysql-connector-c++/include/mysql/jdbc.h"
 
 class Rows {
 public:
